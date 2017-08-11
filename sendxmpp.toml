@@ -1,0 +1,4 @@
+# jid and password exactly like this, nothing else
+
+jid = "jid@example.org"
+password = "sOmePa55W0rD"

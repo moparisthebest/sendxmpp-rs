@@ -1,0 +1,13 @@
+[package]
+name = "sendxmpp-rs"
+version = "0.1.0"
+authors = ["moparisthebest <admin@moparisthebest.com>"]
+
+[dependencies]
+xmpp = { git = "https://gitlab.com/lumi/xmpp-rs.git" }
+#xmpp = "0.2.0"
+toml = "0.4.4"
+serde_derive = "1.0.11"
+serde = "1.0.11"
+gumdrop = "0.3.0"
+gumdrop_derive = "0.3.0"
