@@ -16,6 +16,7 @@ use std::env;
 use std::iter::Iterator;
 use std::io::{Read, stdin};
 use std::fs::File;
+use std::path::Path;
 
 use std::env::args;
 use gumdrop::Options;
@@ -26,15 +27,20 @@ struct Config {
     password: String,
 }
 
-fn parse_cfg(path: &str) -> Option<Config> {
-    File::open(path).and_then(|mut f| {
-        let mut input = String::new();
-        f.read_to_string(&mut input)?;
-        match toml::from_str(&input) {
-            Ok(toml) => Ok(toml),
-            Err(error) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, error))
+fn parse_cfg<P: AsRef<Path>>(path: P) -> Option<Config> {
+    match File::open(path) {
+        Ok(mut f) => {
+            let mut input = String::new();
+            match f.read_to_string(&mut input) {
+                Ok(_) => match toml::from_str(&input) {
+                    Ok(toml) => Some(toml),
+                    Err(_) => None
+                },
+                Err(_) => None
+            }
         }
-    }).ok()
+        Err(_) => None
+    }
 }
 
 #[derive(Default, Options)]
@@ -77,20 +83,15 @@ fn main() {
         return;
     }
 
-    let recipients: Vec<Jid> = opts.recipients.iter().map(|s| s.parse::<Jid>().unwrap()).collect();
+    let recipients: Vec<Jid> = opts.recipients.iter().map(|s| s.parse::<Jid>().expect("invalid recipient jid")).collect();
 
     let cfg = match opts.config {
-        Some(config) => parse_cfg(&config).unwrap(),
-        None => {
-            let mut home_cfg = String::new();
-            home_cfg += env::home_dir().unwrap().to_str().unwrap();
-            home_cfg += "/.config/sendxmpp.toml";
-
-            parse_cfg(&home_cfg).unwrap_or_else(|| parse_cfg("/etc/sendxmpp/sendxmpp.toml").unwrap())
-        }
+        Some(config) => parse_cfg(&config).expect("provided config cannot be found/parsed"),
+        None => parse_cfg(env::home_dir().expect("cannot find home directory").join(".config/sendxmpp.toml"))
+            .or_else(|| parse_cfg("/etc/sendxmpp/sendxmpp.toml")).expect("valid config file not found")
     };
 
-    let jid: Jid = cfg.jid.parse().unwrap();
+    let jid: Jid = cfg.jid.parse().expect("invalid jid in config file");
 
     let mut data = String::new();
     stdin().read_to_string(&mut data).expect("error reading from stdin");
@@ -98,17 +99,17 @@ fn main() {
     let mut client = ClientBuilder::new(jid)
         .password(cfg.password)
         .connect()
-        .unwrap();
+        .expect("client cannot connect");
 
     client.register_plugin(MessagingPlugin::new());
 
     for recipient in recipients {
-        client.plugin::<MessagingPlugin>().send_message(&recipient, &data).unwrap();
+        client.plugin::<MessagingPlugin>().send_message(&recipient, &data).expect("error sending message");
     }
 
     thread::spawn(|| {
         thread::sleep(Duration::from_millis(4000));
         std::process::exit(0);
     });
-    client.main().unwrap()
+    client.main().expect("error during client main")
 }

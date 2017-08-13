@@ -1,7 +1,10 @@
 [package]
-name = "sendxmpp-rs"
+name = "sendxmpp"
 version = "0.1.0"
 authors = ["moparisthebest <admin@moparisthebest.com>"]
+description = "A fun game where you guess what number the computer has chosen."
+license = "GPL-3.0+"
+readme = "README.md"
 
 [dependencies]
 xmpp = { git = "https://gitlab.com/lumi/xmpp-rs.git" }
