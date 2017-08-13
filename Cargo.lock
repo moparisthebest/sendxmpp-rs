@@ -7,7 +7,7 @@ dependencies = [
  "serde 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "xmpp 0.2.0 (git+https://gitlab.com/lumi/xmpp-rs.git)",
+ "xmpp 0.2.0",
 ]
 
 [[package]]
@@ -461,7 +461,6 @@ dependencies = [
 [[package]]
 name = "xmpp"
 version = "0.2.0"
-source = "git+https://gitlab.com/lumi/xmpp-rs.git#6ad21dbf833e2b5f2f8c05b73213b0e55e81ef3d"
 dependencies = [
  "base64 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -553,5 +552,4 @@ dependencies = [
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"
 "checksum xml-rs 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b46ee689ba7a669c08a1170c2348d2516c62dc461135c9e86b2f1f476e07be4a"
-"checksum xmpp 0.2.0 (git+https://gitlab.com/lumi/xmpp-rs.git)" = "<none>"
 "checksum xmpp-parsers 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d64ede139ed5557a09f076b0d5bdc8a673555ef976746233eb906ef76e90eeac"

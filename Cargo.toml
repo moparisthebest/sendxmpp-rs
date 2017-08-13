@@ -7,7 +7,8 @@ license = "GPL-3.0+"
 readme = "README.md"
 
 [dependencies]
-xmpp = { git = "https://gitlab.com/lumi/xmpp-rs.git" }
+#xmpp = { git = "https://gitlab.com/lumi/xmpp-rs.git" }
+xmpp = { path = "xmpp-rs", version = "0.2.0" }
 #xmpp = "0.2.0"
 toml = "0.4.4"
 serde_derive = "1.0.11"
