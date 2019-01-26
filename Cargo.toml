@@ -2,7 +2,7 @@
 name = "sendxmpp"
 version = "0.1.0"
 authors = ["moparisthebest <admin@moparisthebest.com>"]
-description = "A fun game where you guess what number the computer has chosen."
+description = "Send XMPP messages from the command line."
 license = "GPL-3.0+"
 readme = "README.md"
 
