@@ -2,7 +2,11 @@
 name = "sendxmpp"
 version = "0.1.0"
 authors = ["moparisthebest <admin@moparisthebest.com>"]
+
 description = "Send XMPP messages from the command line."
+repository  = "https://code.moparisthebest.com/moparisthebest/sendxmpp-rs"
+keywords    = ["xmpp"]
+
 license = "GPL-3.0+"
 readme = "README.md"
 
