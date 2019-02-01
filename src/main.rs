@@ -3,14 +3,13 @@ use std::fs::File;
 use std::io::{stdin, Read};
 use std::iter::Iterator;
 use std::path::Path;
-use std::thread;
-use std::time::Duration;
 
 use gumdrop::Options;
 use serde_derive::Deserialize;
 
 use futures::{future, Sink, Stream};
 use tokio::runtime::current_thread::Runtime;
+use tokio_xmpp::xmpp_codec::Packet;
 use tokio_xmpp::Client;
 use xmpp_parsers::message::{Body, Message};
 use xmpp_parsers::{Element, Jid};
@@ -110,36 +109,27 @@ fn main() {
 
     // Make the two interfaces for sending and receiving independent
     // of each other so we can move one into a closure.
-    let (mut sink, stream) = client.split();
-    // Wrap sink in Option so that we can take() it for the send(self)
-    // to consume and return it back when ready.
-    let mut send = move |stanza| {
-        sink.start_send(stanza).expect("start_send");
-    };
+    let (sink, stream) = client.split();
+    let mut sink_state = Some(sink);
+
     // Main loop, processes events
-    let done = stream.for_each(|event| {
+    let done = stream.for_each(move |event| {
         if event.is_online() {
+            let mut sink = sink_state.take().unwrap();
             for recipient in recipients {
                 let reply = make_reply(recipient.clone(), &data);
-                send(reply);
+                sink.start_send(Packet::Stanza(reply)).expect("send failed");
             }
+            sink.start_send(Packet::StreamEnd)
+                .expect("send stream end failed");
         }
 
         Box::new(future::ok(()))
     });
 
-    thread::spawn(|| {
-        thread::sleep(Duration::from_millis(4000));
-        std::process::exit(0);
-    });
-
     // Start polling `done`
     match rt.block_on(done) {
-        Ok(_) => {
-            println!("successful exiting");
-            std::process::exit(0);
-            //()
-        }
+        Ok(_) => (),
         Err(e) => {
             println!("Fatal: {}", e);
             ()
