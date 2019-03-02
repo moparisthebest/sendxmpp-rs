@@ -4,6 +4,7 @@ use std::io::{stdin, Read};
 use std::iter::Iterator;
 use std::path::Path;
 
+use die::{die, Die};
 use gumdrop::Options;
 use serde_derive::Deserialize;
 
@@ -62,50 +63,56 @@ fn main() {
     // Remember to skip the first argument. That's the program name.
     let opts = match MyOptions::parse_args_default(&args[1..]) {
         Ok(opts) => opts,
-        Err(e) => {
-            println!("{}: {}", args[0], e);
-            println!("Usage: {} [OPTIONS] [ARGUMENTS]", args[0]);
-            println!();
-            println!("{}", MyOptions::usage());
-            return;
-        }
+        Err(e) => die!(
+            "{}: {}\nUsage: {} [OPTIONS] [ARGUMENTS]\n\n{}",
+            args[0],
+            e,
+            args[0],
+            MyOptions::usage()
+        ),
     };
 
     if opts.help {
-        println!("Usage: {} [OPTIONS] [ARGUMENTS]", args[0]);
-        println!();
-        println!("{}", MyOptions::usage());
-        return;
+        die!(
+            "Usage: {} [OPTIONS] [ARGUMENTS]\n\n{}",
+            args[0],
+            MyOptions::usage()
+        );
     }
 
     let recipients: Vec<Jid> = opts
         .recipients
         .iter()
-        .map(|s| s.parse::<Jid>().expect("invalid recipient jid"))
+        .map(|s| s.parse::<Jid>().die("invalid recipient jid"))
         .collect();
+
+    if recipients.is_empty() {
+        die!("no recipients specified!");
+    }
+
     let recipients = &recipients;
 
     let cfg = match opts.config {
-        Some(config) => parse_cfg(&config).expect("provided config cannot be found/parsed"),
+        Some(config) => parse_cfg(&config).die("provided config cannot be found/parsed"),
         None => parse_cfg(
             dirs::config_dir()
-                .expect("cannot find home directory")
+                .die("cannot find home directory")
                 .join("sendxmpp.toml"),
         )
         .or_else(|| parse_cfg("/etc/sendxmpp/sendxmpp.toml"))
-        .expect("valid config file not found"),
+        .die("valid config file not found"),
     };
 
     let mut data = String::new();
     stdin()
         .read_to_string(&mut data)
-        .expect("error reading from stdin");
+        .die("error reading from stdin");
     let data = data.trim();
 
     // tokio_core context
-    let mut rt = Runtime::new().unwrap();
+    let mut rt = Runtime::new().die("unknown error");
     // Client instance
-    let client = Client::new(&cfg.jid, &cfg.password).expect("could not connect to xmpp server");
+    let client = Client::new(&cfg.jid, &cfg.password).die("could not connect to xmpp server");
 
     // Make the two interfaces for sending and receiving independent
     // of each other so we can move one into a closure.
@@ -115,13 +122,13 @@ fn main() {
     // Main loop, processes events
     let done = stream.for_each(move |event| {
         if event.is_online() {
-            let mut sink = sink_state.take().unwrap();
+            let mut sink = sink_state.take().die("unknown error");
             for recipient in recipients {
                 let reply = make_reply(recipient.clone(), &data);
-                sink.start_send(Packet::Stanza(reply)).expect("send failed");
+                sink.start_send(Packet::Stanza(reply)).die("send failed");
             }
             sink.start_send(Packet::StreamEnd)
-                .expect("send stream end failed");
+                .die("send stream end failed");
         }
 
         Box::new(future::ok(()))
@@ -130,10 +137,7 @@ fn main() {
     // Start polling `done`
     match rt.block_on(done) {
         Ok(_) => (),
-        Err(e) => {
-            println!("Fatal: {}", e);
-            ()
-        }
+        Err(e) => die!("Fatal: {}", e),
     };
 }
 
