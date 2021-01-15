@@ -172,12 +172,27 @@ fn gpg_encrypt(to: Jid, body: &str) -> Result<String> {
 
     let output = output.stdout;
 
-    if output.len() < (28+26+10) { // 10 is just a... fudge factor
+    // strip off headers per https://xmpp.org/extensions/xep-0027.html
+    // header spec: https://tools.ietf.org/html/rfc4880#section-6.2
+
+    // find index of leading blank line (2 newlines in a row)
+    let start = first_index_of(0, &output, &[10, 10])? + 2;
+
+    if output.len() <= start {
         bail!("length {} returned by gpg too short to be valid", output.len());
     }
 
-    let start = 28; // length of -----BEGIN PGP MESSAGE----- is 28
-    let end = output.len() - 26; // length of -----END PGP MESSAGE----- is 26
+    // find first newline+dash after the start
+    let end = first_index_of(start, &output, &[10, 45])?;
 
     Ok(String::from_utf8((&output[start..end]).to_vec())?)
+}
+
+fn first_index_of(start_index: usize, haystack: &[u8], needle: &[u8]) -> Result<usize> {
+    for i in start_index..haystack.len()-needle.len()+1 {
+        if haystack[i..i+needle.len()] == needle[..] {
+            return Ok(i);
+        }
+    }
+    Err(anyhow!("not found"))
 }
