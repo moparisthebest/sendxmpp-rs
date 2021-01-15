@@ -1,6 +1,6 @@
 use std::env::args;
 use std::fs::File;
-use std::io::{stdin, Read};
+use std::io::{stdin, Read, Write};
 use std::iter::Iterator;
 use std::path::Path;
 
@@ -11,6 +11,9 @@ use serde_derive::Deserialize;
 use tokio_xmpp::SimpleClient as Client;
 use xmpp_parsers::message::{Body, Message};
 use xmpp_parsers::{Element, Jid};
+use std::process::{Command, Stdio};
+
+use anyhow::{Result, bail, anyhow};
 
 #[derive(Deserialize)]
 struct Config {
@@ -111,8 +114,27 @@ async fn main() {
     let mut client = Client::new(&cfg.jid, &cfg.password).await.die("could not connect to xmpp server");
 
     for recipient in recipients {
-        let reply = make_reply(recipient.clone(), &data);
-        client.send_stanza(reply).await.unwrap();
+        let reply = if opts.force_pgp || opts.attempt_pgp {
+            let encrypted = gpg_encrypt(recipient.clone(), &data);
+            if encrypted.is_err() {
+                if opts.force_pgp {
+                    die!("pgp encryption to jid '{}' failed!", recipient);
+                } else {
+                    make_reply(recipient.clone(), &data)
+                }
+            } else {
+                let encrypted = encrypted.unwrap();
+                let encrypted = encrypted.trim();
+                let mut reply = make_reply(recipient.clone(), "pgp");
+                let mut x = Element::bare("x", "jabber:x:encrypted");
+                x.append_text_node(encrypted);
+                reply.append_child(x);
+                reply
+            }
+        } else {
+            make_reply(recipient.clone(), &data)
+        };
+        client.send_stanza(reply).await.die("sending message failed");
     }
 
     // Close client connection
@@ -124,4 +146,38 @@ fn make_reply(to: Jid, body: &str) -> Element {
     let mut message = Message::new(Some(to));
     message.bodies.insert(String::new(), Body(body.to_owned()));
     message.into()
+}
+
+fn gpg_encrypt(to: Jid, body: &str) -> Result<String> {
+    let to: String = std::convert::From::from(to);
+    let mut gpg_cmd = Command::new("gpg")
+        .arg("--encrypt")
+        .arg("--armor")
+        .arg("-r")
+        .arg(to)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+
+    {
+        let stdin = gpg_cmd.stdin.as_mut().ok_or_else(|| anyhow!("no gpg stdin"))?;
+        stdin.write_all(body.as_bytes())?;
+    }
+
+    let output = gpg_cmd.wait_with_output()?;
+
+    if !output.status.success() {
+        bail!("gpg exited with non-zero status code");
+    }
+
+    let output = output.stdout;
+
+    if output.len() < (28+26+10) { // 10 is just a... fudge factor
+        bail!("length {} returned by gpg too short to be valid", output.len());
+    }
+
+    let start = 28; // length of -----BEGIN PGP MESSAGE----- is 28
+    let end = output.len() - 26; // length of -----END PGP MESSAGE----- is 26
+
+    Ok(String::from_utf8((&output[start..end]).to_vec())?)
 }

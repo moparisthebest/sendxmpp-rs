@@ -1,6 +1,6 @@
 [package]
 name = "sendxmpp"
-version = "1.0.1"
+version = "2.0.0"
 authors = ["moparisthebest <admin@moparisthebest.com>"]
 
 description = "Send XMPP messages from the command line."
@@ -25,3 +25,4 @@ tokio-xmpp = "3.0.0"
 tokio = { version = "1", features = ["net", "rt", "rt-multi-thread", "macros"] }
 xmpp-parsers = "0.18"
 die = "0.2.0"
+anyhow = "1.0"
