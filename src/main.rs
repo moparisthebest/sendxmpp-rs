@@ -8,10 +8,7 @@ use die::{die, Die};
 use gumdrop::Options;
 use serde_derive::Deserialize;
 
-use futures::{future, Sink, Stream};
-use tokio::runtime::current_thread::Runtime;
-use tokio_xmpp::xmpp_codec::Packet;
-use tokio_xmpp::Client;
+use tokio_xmpp::SimpleClient as Client;
 use xmpp_parsers::message::{Body, Message};
 use xmpp_parsers::{Element, Jid};
 
@@ -57,7 +54,8 @@ struct MyOptions {
     attempt_pgp: bool,
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let args: Vec<String> = args().collect();
 
     // Remember to skip the first argument. That's the program name.
@@ -109,36 +107,16 @@ fn main() {
         .die("error reading from stdin");
     let data = data.trim();
 
-    // tokio_core context
-    let mut rt = Runtime::new().die("unknown error");
     // Client instance
-    let client = Client::new(&cfg.jid, &cfg.password).die("could not connect to xmpp server");
+    let mut client = Client::new(&cfg.jid, &cfg.password).await.die("could not connect to xmpp server");
 
-    // Make the two interfaces for sending and receiving independent
-    // of each other so we can move one into a closure.
-    let (sink, stream) = client.split();
-    let mut sink_state = Some(sink);
+    for recipient in recipients {
+        let reply = make_reply(recipient.clone(), &data);
+        client.send_stanza(reply).await.unwrap();
+    }
 
-    // Main loop, processes events
-    let done = stream.for_each(move |event| {
-        if event.is_online() {
-            let mut sink = sink_state.take().die("unknown error");
-            for recipient in recipients {
-                let reply = make_reply(recipient.clone(), &data);
-                sink.start_send(Packet::Stanza(reply)).die("send failed");
-            }
-            sink.start_send(Packet::StreamEnd)
-                .die("send stream end failed");
-        }
-
-        Box::new(future::ok(()))
-    });
-
-    // Start polling `done`
-    match rt.block_on(done) {
-        Ok(_) => (),
-        Err(e) => die!("Fatal: {}", e),
-    };
+    // Close client connection
+    client.end().await.ok(); // ignore errors here, I guess
 }
 
 // Construct a chat <message/>
