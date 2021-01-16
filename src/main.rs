@@ -21,20 +21,11 @@ struct Config {
     password: String,
 }
 
-fn parse_cfg<P: AsRef<Path>>(path: P) -> Option<Config> {
-    match File::open(path) {
-        Ok(mut f) => {
-            let mut input = String::new();
-            match f.read_to_string(&mut input) {
-                Ok(_) => match toml::from_str(&input) {
-                    Ok(toml) => Some(toml),
-                    Err(_) => None,
-                },
-                Err(_) => None,
-            }
-        }
-        Err(_) => None,
-    }
+fn parse_cfg<P: AsRef<Path>>(path: P) -> Result<Config> {
+    let mut f = File::open(path)?;
+    let mut input = String::new();
+    f.read_to_string(&mut input)?;
+    Ok(toml::from_str(&input)?)
 }
 
 #[derive(Default, Options)]
@@ -100,7 +91,7 @@ async fn main() {
                 .die("cannot find home directory")
                 .join("sendxmpp.toml"),
         )
-        .or_else(|| parse_cfg("/etc/sendxmpp/sendxmpp.toml"))
+        .or_else(|_| parse_cfg("/etc/sendxmpp/sendxmpp.toml"))
         .die("valid config file not found"),
     };
 

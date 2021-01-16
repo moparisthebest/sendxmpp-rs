@@ -7,12 +7,17 @@ description = "Send XMPP messages from the command line."
 repository  = "https://code.moparisthebest.com/moparisthebest/sendxmpp-rs"
 keywords    = ["xmpp"]
 
-license = "GPL-3.0+"
+license = "AGPL-3.0-or-later"
 readme = "README.md"
 
 edition = "2018"
 
-exclude = [ ".gitignore" ]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "*.md",
+    "sendxmpp.toml",
+]
 
 [dependencies]
 toml = "0.5"
