@@ -10,7 +10,7 @@ SUFFIX=""
 echo "$TARGET" | grep -E '^x86_64-pc-windows-gnu$' >/dev/null && SUFFIX=".exe"
 
 # ring fails to compile here
-echo "$TARGET" | grep -E '^mips64el-unknown-linux-gnuabi64$' >/dev/null && exit 0
+echo "$TARGET" | grep -E '^(s390x|powerpc|mips|riscv64gc|.*solaris$)' >/dev/null && echo "$TARGET not supported in rustls" && exit 0
 
 # build binary
 cross build --target $TARGET --release
