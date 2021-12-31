@@ -32,4 +32,4 @@ tokio-tls = { package = "tokio-native-tls", version = "0.3" }
 xmpp-parsers = "0.18"
 die = "0.2.0"
 anyhow = "1.0"
-
+env_logger = "0.9"

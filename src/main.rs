@@ -58,6 +58,8 @@ struct MyOptions {
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let args: Vec<String> = args().collect();
 
     // Remember to skip the first argument. That's the program name.
