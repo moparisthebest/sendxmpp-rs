@@ -3,6 +3,7 @@ use std::fs::File;
 use std::io::{stdin, Read, Write};
 use std::iter::Iterator;
 use std::path::Path;
+use std::str::FromStr;
 
 use die::{die, Die};
 use gumdrop::Options;
@@ -10,9 +11,10 @@ use serde_derive::Deserialize;
 
 use std::process::{Command, Stdio};
 use tokio_xmpp::{xmpp_stream, SimpleClient as Client};
-use xmpp_parsers::message::{Body, Message};
+use xmpp_parsers::message::{Body, Message, MessageType};
+use xmpp_parsers::muc::Muc;
 use xmpp_parsers::presence::{Presence, Show as PresenceShow, Type as PresenceType};
-use xmpp_parsers::{Element, Jid};
+use xmpp_parsers::{BareJid, Element, FullJid, Jid};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio_tls::TlsStream;
@@ -54,6 +56,12 @@ struct MyOptions {
 
     #[options(help = "Send a <presence/> after connecting before sending messages, required for receiving for --raw")]
     presence: bool,
+
+    #[options(help = "Recipients are Multi-User Chats")]
+    muc: bool,
+
+    #[options(help = "Nickname to use in Multi-User Chats")]
+    nick: Option<String>,
 }
 
 #[tokio::main]
@@ -79,8 +87,17 @@ async fn main() {
         if !recipients.is_empty() {
             die!("--raw is incompatible with recipients");
         }
+        if opts.muc {
+            die!("--raw is incompatible with --muc");
+        }
     } else if recipients.is_empty() {
         die!("no recipients specified!");
+    }
+
+    if opts.muc {
+        if opts.force_pgp || opts.attempt_pgp {
+            die!("--force-pgp and --attempt-pgp isn't implemented with --muc");
+        }
     }
 
     let recipients = &recipients;
@@ -151,27 +168,44 @@ async fn main() {
         }
 
         for recipient in recipients {
-            let reply = if opts.force_pgp || opts.attempt_pgp {
-                let encrypted = gpg_encrypt(recipient.clone(), &data);
-                if encrypted.is_err() {
-                    if opts.force_pgp {
-                        die!("pgp encryption to jid '{}' failed!", recipient);
+            if opts.muc {
+                let nick = {
+                    let opt = opts.nick.clone();
+                    let node = BareJid::from_str(cfg.jid.as_str()).unwrap().node;
+                    opt.or(node).die("couldn't find a nick to use")
+                };
+                let participant = match recipient.clone() {
+                    Jid::Full(_) => die!("Invalid room address"),
+                    Jid::Bare(bare) => bare.with_resource(nick.clone()),
+                };
+                let join = make_join(participant.clone());
+                client.send_stanza(join).await.die("failed to join MUC");
+
+                let reply = make_reply(recipient.clone(), &data, opts.muc);
+                client.send_stanza(reply).await.die("sending message failed");
+            } else {
+                let reply = if opts.force_pgp || opts.attempt_pgp {
+                    let encrypted = gpg_encrypt(recipient.clone(), &data);
+                    if encrypted.is_err() {
+                        if opts.force_pgp {
+                            die!("pgp encryption to jid '{}' failed!", recipient);
+                        } else {
+                            make_reply(recipient.clone(), &data, opts.muc)
+                        }
                     } else {
-                        make_reply(recipient.clone(), &data)
+                        let encrypted = encrypted.unwrap();
+                        let encrypted = encrypted.trim();
+                        let mut reply = make_reply(recipient.clone(), "pgp", opts.muc);
+                        let mut x = Element::bare("x", "jabber:x:encrypted");
+                        x.append_text_node(encrypted);
+                        reply.append_child(x);
+                        reply
                     }
                 } else {
-                    let encrypted = encrypted.unwrap();
-                    let encrypted = encrypted.trim();
-                    let mut reply = make_reply(recipient.clone(), "pgp");
-                    let mut x = Element::bare("x", "jabber:x:encrypted");
-                    x.append_text_node(encrypted);
-                    reply.append_child(x);
-                    reply
-                }
-            } else {
-                make_reply(recipient.clone(), &data)
-            };
-            client.send_stanza(reply).await.die("sending message failed");
+                    make_reply(recipient.clone(), &data, opts.muc)
+                };
+                client.send_stanza(reply).await.die("sending message failed");
+            }
         }
 
         // Close client connection
@@ -186,9 +220,16 @@ fn make_presence() -> Element {
     presence.into()
 }
 
+fn make_join(to: FullJid) -> Element {
+    Presence::new(PresenceType::None).with_to(Jid::Full(to)).with_payloads(vec![Muc::new().into()]).into()
+}
+
 // Construct a chat <message/>
-fn make_reply(to: Jid, body: &str) -> Element {
+fn make_reply(to: Jid, body: &str, groupchat: bool) -> Element {
     let mut message = Message::new(Some(to));
+    if groupchat {
+        message.type_ = MessageType::Groupchat;
+    }
     message.bodies.insert(String::new(), Body(body.to_owned()));
     message.into()
 }
