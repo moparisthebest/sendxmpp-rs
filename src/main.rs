@@ -25,6 +25,7 @@ use anyhow::{anyhow, bail, Result};
 struct Config {
     jid: String,
     password: String,
+    nick: Option<String>,
 }
 
 fn parse_cfg<P: AsRef<Path>>(path: P) -> Result<Config> {
@@ -169,11 +170,12 @@ async fn main() {
 
         for recipient in recipients {
             if opts.muc {
-                let nick = {
-                    let opt = opts.nick.clone();
-                    let node = BareJid::from_str(cfg.jid.as_str()).unwrap().node;
-                    opt.or(node).die("couldn't find a nick to use")
-                };
+                let nick = opts
+                    .nick
+                    .clone()
+                    .or(cfg.nick.clone())
+                    .or_else(|| BareJid::from_str(cfg.jid.as_str()).unwrap().node)
+                    .die("couldn't find a nick to use");
                 let participant = match recipient.clone() {
                     Jid::Full(_) => die!("Invalid room address"),
                     Jid::Bare(bare) => bare.with_resource(nick.clone()),
