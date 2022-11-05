@@ -1,6 +1,6 @@
 [package]
 name = "sendxmpp"
-version = "3.0.0"
+version = "3.0.1"
 authors = ["moparisthebest <admin@moparisthebest.com>"]
 
 description = "Send XMPP messages from the command line."
