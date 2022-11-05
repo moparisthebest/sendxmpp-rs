@@ -18,6 +18,10 @@ Optional arguments:
   -c, --config CONFIG  path to config file. default: ~/.config/sendxmpp.toml with fallback to /etc/sendxmpp/sendxmpp.toml
   -e, --force-pgp      Force OpenPGP encryption for all recipients
   -a, --attempt-pgp    Attempt OpenPGP encryption for all recipients
+  -r, --raw            Send raw XML stream, cannot be used with recipients or PGP
+  -p, --presence       Send a <presence/> after connecting before sending messages, required for receiving for --raw
+  -m, --muc            Recipients are Multi-User Chats
+  -n, --nick NICK      Nickname to use in Multi-User Chats
 ```
 
 Usage examples:

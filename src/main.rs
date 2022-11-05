@@ -163,6 +163,10 @@ async fn main() {
         let mut data = String::new();
         stdin().lock().read_to_string(&mut data).die("error reading from stdin");
         let data = data.trim();
+        if data.is_empty() {
+            // don't send empty stanzas
+            return;
+        }
 
         let mut client = Client::new(&cfg.jid, &cfg.password).await.die("could not connect to xmpp server");
 
