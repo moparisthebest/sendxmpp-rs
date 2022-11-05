@@ -25,11 +25,10 @@ serde_derive = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 gumdrop = "0.8.0"
 gumdrop_derive = "0.8.0"
-dirs = "3.0.1"
-tokio-xmpp = "3.0.0"
+dirs = "4.0.0"
+tokio-xmpp = { version = "3.2.0", default-features = false, features = ["tls-rust"] }
 tokio = { version = "1", features = ["net", "rt", "rt-multi-thread", "macros", "io-util", "io-std"] }
-tokio-tls = { package = "tokio-native-tls", version = "0.3" }
-xmpp-parsers = "0.18"
+xmpp-parsers = "0.19"
 die = "0.2.0"
 anyhow = "1.0"
 env_logger = "0.9"

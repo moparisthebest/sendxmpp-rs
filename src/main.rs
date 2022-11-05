@@ -10,14 +10,13 @@ use gumdrop::Options;
 use serde_derive::Deserialize;
 
 use std::process::{Command, Stdio};
-use tokio_xmpp::{xmpp_stream, SimpleClient as Client};
+use tokio_xmpp::{SimpleClient as Client};
 use xmpp_parsers::message::{Body, Message, MessageType};
 use xmpp_parsers::muc::Muc;
 use xmpp_parsers::presence::{Presence, Show as PresenceShow, Type as PresenceType};
 use xmpp_parsers::{BareJid, Element, FullJid, Jid};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio_tls::TlsStream;
 
 use anyhow::{anyhow, bail, Result};
 
@@ -121,19 +120,13 @@ async fn main() {
 
         // can paste this to test: <message xmlns="jabber:client" to="travis@burtrum.org" type="chat"><body>woot</body></message>
 
-        pub struct OpenClient {
-            pub stream: xmpp_stream::XMPPStream<TlsStream<tokio::net::TcpStream>>,
-        }
-        let client: OpenClient = unsafe { std::mem::transmute(client) };
-        let mut open_client = client.stream.stream.try_lock().die("could not lock client stream");
-        let open_client = open_client.get_mut();
+        let mut open_client = client.into_inner().into_inner();
 
         let mut rd_buf = [0u8; 256]; // todo: proper buffer size?
         let mut stdin_buf = rd_buf.clone();
 
         let mut stdin = tokio::io::stdin();
         let mut stdout = tokio::io::stdout();
-
         loop {
             tokio::select! {
                 n = open_client.read(&mut rd_buf) => {
