@@ -1,4 +1,5 @@
-# jid and password exactly like this, nothing else
+# jid and password exactly like this
 
 jid = "jid@example.org"
 password = "sOmePa55W0rD"
+# nick = "foobar"  # optional nick for Multi-User Chat
