@@ -1,24 +1,32 @@
-use std::env::args;
-use std::fs::File;
-use std::io::{stdin, Read, Write};
-use std::iter::Iterator;
-use std::path::Path;
-use std::str::FromStr;
-
 use die::{die, Die};
 use gumdrop::Options;
 use serde_derive::Deserialize;
+use std::{
+    convert::TryInto,
+    env::args,
+    fs::File,
+    io::{stdin, Read, Write},
+    iter::Iterator,
+    path::Path,
+    str::FromStr,
+};
 
 use std::process::{Command, Stdio};
-use tokio_xmpp::{SimpleClient as Client};
-use xmpp_parsers::message::{Body, Message, MessageType};
-use xmpp_parsers::muc::Muc;
-use xmpp_parsers::presence::{Presence, Show as PresenceShow, Type as PresenceType};
-use xmpp_parsers::{BareJid, Element, FullJid, Jid};
+//use tokio_xmpp::SimpleClient as Client;
+use tokio_xmpp::parsers::{
+    message::{Message, MessageType},
+    muc::Muc,
+    presence::{Presence, Show as PresenceShow, Type as PresenceType},
+};
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio_xmpp::{
+    jid::{BareJid, FullJid},
+    minidom::Element,
+    Client, Stanza,
+};
 
 use anyhow::{anyhow, bail, Result};
+use tokio_xmpp::{jid::Jid, parsers::message::Lang};
 
 #[derive(Deserialize)]
 struct Config {
@@ -111,8 +119,9 @@ async fn main() {
             .die("valid config file not found"),
     };
 
+    let jid = cfg.jid.parse::<Jid>().die("invalid recipient jid");
     if opts.raw {
-        let mut client = Client::new(&cfg.jid, &cfg.password).await.die("could not connect to xmpp server");
+        let mut client = Client::new(jid, &cfg.password);
 
         if opts.presence {
             client.send_stanza(make_presence()).await.die("could not send presence");
@@ -120,6 +129,7 @@ async fn main() {
 
         // can paste this to test: <message xmlns="jabber:client" to="travis@burtrum.org" type="chat"><body>woot</body></message>
 
+        /*
         let mut open_client = client.into_inner().into_inner();
 
         let mut rd_buf = [0u8; 256]; // todo: proper buffer size?
@@ -152,6 +162,9 @@ async fn main() {
         open_client.write_all("</stream:stream>".as_bytes()).await.ok();
         open_client.flush().await.ok();
         open_client.read(&mut rd_buf).await.ok();
+
+         */
+        todo!("is it possible to get a stream anymore");
     } else {
         let mut data = String::new();
         stdin().lock().read_to_string(&mut data).die("error reading from stdin");
@@ -161,7 +174,8 @@ async fn main() {
             return;
         }
 
-        let mut client = Client::new(&cfg.jid, &cfg.password).await.die("could not connect to xmpp server");
+        let mut client = Client::new(jid, &cfg.password);
+        //let mut client = Client::new_direct_tls(jid, &cfg.password);
 
         if opts.presence {
             client.send_stanza(make_presence()).await.die("could not send presence");
@@ -173,17 +187,17 @@ async fn main() {
                     .nick
                     .clone()
                     .or(cfg.nick.clone())
-                    .or_else(|| BareJid::from_str(cfg.jid.as_str()).unwrap().node)
+                    .or_else(|| BareJid::from_str(cfg.jid.as_str()).unwrap().node().map(|n| n.to_string()))
                     .die("couldn't find a nick to use");
-                let participant = match recipient.clone() {
-                    Jid::Full(_) => die!("Invalid room address"),
-                    Jid::Bare(bare) => bare.with_resource(nick.clone()),
+                let participant = match recipient.clone().try_into_full() {
+                    Ok(_) => die!("Invalid room address"),
+                    Err(bare) => bare.with_resource_str(&nick).die("invalid room nick"),
                 };
                 let join = make_join(participant.clone());
                 client.send_stanza(join).await.die("failed to join MUC");
 
                 let reply = make_reply(recipient.clone(), &data, opts.muc);
-                client.send_stanza(reply).await.die("sending message failed");
+                client.send_stanza(reply.try_into().expect("should be impossible")).await.die("sending message failed");
             } else {
                 let reply = if opts.force_pgp || opts.attempt_pgp {
                     let encrypted = gpg_encrypt(recipient.clone(), &data);
@@ -205,24 +219,24 @@ async fn main() {
                 } else {
                     make_reply(recipient.clone(), &data, opts.muc)
                 };
-                client.send_stanza(reply).await.die("sending message failed");
+                client.send_stanza(reply.try_into().expect("should be impossible")).await.die("sending message failed");
             }
         }
 
         // Close client connection
-        client.end().await.ok(); // ignore errors here, I guess
+        client.send_end().await.ok(); // ignore errors here, I guess
     }
 }
 
 // Construct a <presence/>
-fn make_presence() -> Element {
+fn make_presence() -> Stanza {
     let mut presence = Presence::new(PresenceType::None);
     presence.show = Some(PresenceShow::Chat);
     presence.into()
 }
 
-fn make_join(to: FullJid) -> Element {
-    Presence::new(PresenceType::None).with_to(Jid::Full(to)).with_payloads(vec![Muc::new().into()]).into()
+fn make_join(to: FullJid) -> Stanza {
+    Presence::new(PresenceType::None).with_to(to).with_payloads(vec![Muc::new().into()]).into()
 }
 
 // Construct a chat <message/>
@@ -231,12 +245,12 @@ fn make_reply(to: Jid, body: &str, groupchat: bool) -> Element {
     if groupchat {
         message.type_ = MessageType::Groupchat;
     }
-    message.bodies.insert(String::new(), Body(body.to_owned()));
+    message.bodies.insert(Lang::new(), body.to_owned());
     message.into()
 }
 
 fn gpg_encrypt(to: Jid, body: &str) -> Result<String> {
-    let to: String = std::convert::From::from(to);
+    let to: String = to.into_inner(); // todo: is this right?
     let mut gpg_cmd = Command::new("gpg")
         .arg("--encrypt")
         .arg("--armor")

@@ -20,15 +20,14 @@ include = [
 ]
 
 [dependencies]
-toml = "0.5"
+toml = "0.9"
 serde_derive = "1.0"
 serde = { version = "1.0", features = ["derive"] }
-gumdrop = "0.8.0"
-gumdrop_derive = "0.8.0"
-dirs = "4.0.0"
-tokio-xmpp = { version = "3.2.0", default-features = false, features = ["tls-rust"] }
+gumdrop = "0.8.1"
+gumdrop_derive = "0.8.1"
+dirs = "6.0.0"
+tokio-xmpp = "5.0.0"
 tokio = { version = "1", features = ["net", "rt", "rt-multi-thread", "macros", "io-util", "io-std"] }
-xmpp-parsers = "0.19"
 die = "0.2.0"
 anyhow = "1.0"
-env_logger = "0.9"
+env_logger = "0.11"
